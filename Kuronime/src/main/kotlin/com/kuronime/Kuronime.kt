@@ -89,11 +89,10 @@ class Kuronime : MainAPI() {
     private fun Element.toSearchResult(): AnimeSearchResponse {
         val href = getProperAnimeLink(fixUrlNull(this.selectFirst("a")?.attr("href")).toString())
         val title = this.select(".bsuxtt, .tt > h4").text().trim()
-       val posterUrl = fixUrlNull(
-    this.selectFirst("img[src*='uploads'], img[data-src*='uploads']")?.let {
-        it.attr("src").ifEmpty { it.attr("data-src") }
-    }
-)
+        val posterUrl = fixUrlNull(
+            this.selectFirst("div.view,div.bt")?.nextElementSibling()?.select("img")
+                ?.attr("data-src")
+        )
         val epNum = this.select(".ep").text().replace(Regex("\\D"), "").trim().toIntOrNull()
         val tvType = getType(this.selectFirst(".bt > span")?.text().toString())
         return newAnimeSearchResponse(title, href, tvType) {
@@ -129,7 +128,7 @@ class Kuronime : MainAPI() {
         val document = app.get(url).document
 
         val title = document.selectFirst(".entry-title")?.text().toString().trim()
-        val poster = document.selectFirst(".wp-post-image")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
+        val poster = document.selectFirst("div.l[itemprop=image] > img")?.attr("data-src")
         val tags = document.select(".infodetail > ul > li:nth-child(2) > a").map { it.text() }
         val type =
             getType(document.selectFirst(".infodetail > ul > li:nth-child(7)")?.ownText()?.removePrefix(":")
