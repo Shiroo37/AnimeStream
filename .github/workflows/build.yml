@@ -76,6 +76,7 @@ jobs:
           cp **/build/*.cs3 ../builds || true
           cp **/build/*.jar ../builds || true
           cp build/plugins.json ../builds || true
+          cp ../src/repo.json ../builds || true
 
       - name: Push builds
         run: |
