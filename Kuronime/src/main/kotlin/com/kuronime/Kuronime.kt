@@ -213,25 +213,27 @@ class Kuronime : MainAPI() {
         coroutineScope {
             // Decrypt src (video utama M3U8)
             launch {
+                val src = servers?.src ?: return@launch
                 val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(servers?.src ?: return@launch),
+                    base64Decode(src),
                     KEY.toByteArray(),
                     false,
                     "AES/CBC/NoPadding"
                 )
-                val source =
-                    tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+                val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+                    ?: return@launch
                 M3u8Helper.generateM3u8(
                     this@KuronimeProvider.name,
-                    source ?: return@launch,
+                    source,
                     "https://player.animeku.org/",
                     headers = mapOf("Origin" to "https://player.animeku.org")
                 ).forEach(callback)
             }
             // Decrypt mirror (server alternatif)
             launch {
+                val mirror = servers?.mirror ?: return@launch
                 val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(servers?.mirror ?: return@launch),
+                    base64Decode(mirror),
                     KEY.toByteArray(),
                     false,
                     "AES/CBC/NoPadding"
