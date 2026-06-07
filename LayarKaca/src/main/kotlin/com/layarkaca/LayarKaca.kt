@@ -33,8 +33,8 @@ import java.nio.charset.StandardCharsets
 
 class LayarKaca : MainAPI() {
 
-    override var mainUrl = "https://lk21.film"
-    private var seriesUrl = "https://tv14.nontondrama.click"
+    override var mainUrl = "https://tv3.lk21online.mom"
+    private var seriesUrl = "https://tv3.lk21online.mom"
 
     override var name = "LayarKaca"
     override val hasMainPage = true
