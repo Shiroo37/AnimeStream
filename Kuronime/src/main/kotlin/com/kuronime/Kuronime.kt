@@ -9,6 +9,8 @@ import com.lagradost.cloudstream3.extractors.helper.AesHelper
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
@@ -208,11 +210,11 @@ class Kuronime : MainAPI() {
             )
         ).parsedSafe<Servers>()
 
-        argamap(
-            {
-                // Decrypt src (video utama M3U8)
+        coroutineScope {
+            // Decrypt src (video utama M3U8)
+            launch {
                 val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(servers?.src ?: return@argamap),
+                    base64Decode(servers?.src ?: return@launch),
                     KEY.toByteArray(),
                     false,
                     "AES/CBC/NoPadding"
@@ -220,24 +222,24 @@ class Kuronime : MainAPI() {
                 val source =
                     tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
                 M3u8Helper.generateM3u8(
-                    this.name,
-                    source ?: return@argamap,
+                    this@KuronimeProvider.name,
+                    source ?: return@launch,
                     "https://player.animeku.org/",
                     headers = mapOf("Origin" to "https://player.animeku.org")
                 ).forEach(callback)
-            },
-            {
-                // Decrypt mirror (server alternatif)
+            }
+            // Decrypt mirror (server alternatif)
+            launch {
                 val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(servers?.mirror ?: return@argamap),
+                    base64Decode(servers?.mirror ?: return@launch),
                     KEY.toByteArray(),
                     false,
                     "AES/CBC/NoPadding"
                 )
                 tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
-                    embed.value.amap {
+                    embed.value.map { entry ->
                         loadFixedExtractor(
-                            it.value,
+                            entry.value,
                             embed.key.removePrefix("v"),
                             "$mainUrl/",
                             subtitleCallback,
@@ -246,7 +248,7 @@ class Kuronime : MainAPI() {
                     }
                 }
             }
-        )
+        }
 
         return true
     }
