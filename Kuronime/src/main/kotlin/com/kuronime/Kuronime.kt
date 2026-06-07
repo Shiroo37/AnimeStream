@@ -9,14 +9,10 @@ import com.lagradost.cloudstream3.extractors.helper.AesHelper
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.ArrayList
@@ -210,44 +206,44 @@ class Kuronime : MainAPI() {
             )
         ).parsedSafe<Servers>()
 
-        coroutineScope {
-            // Decrypt src (video utama M3U8)
-            launch {
-                val src = servers?.src ?: return@launch
-                val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(src),
-                    KEY.toByteArray(),
-                    false,
-                    "AES/CBC/NoPadding"
-                )
-                val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
-                    ?: return@launch
+        // Decrypt src (video utama M3U8)
+        val src = servers?.src
+        if (src != null) {
+            val decrypt = AesHelper.cryptoAESHandler(
+                base64Decode(src),
+                KEY.toByteArray(),
+                false,
+                "AES/CBC/NoPadding"
+            )
+            val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+            if (source != null) {
                 M3u8Helper.generateM3u8(
-                    this@KuronimeProvider.name,
+                    name,
                     source,
                     "https://player.animeku.org/",
                     headers = mapOf("Origin" to "https://player.animeku.org")
                 ).forEach(callback)
             }
-            // Decrypt mirror (server alternatif)
-            launch {
-                val mirror = servers?.mirror ?: return@launch
-                val decrypt = AesHelper.cryptoAESHandler(
-                    base64Decode(mirror),
-                    KEY.toByteArray(),
-                    false,
-                    "AES/CBC/NoPadding"
-                )
-                tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
-                    embed.value.map { entry ->
-                        loadFixedExtractor(
-                            entry.value,
-                            embed.key.removePrefix("v"),
-                            "$mainUrl/",
-                            subtitleCallback,
-                            callback
-                        )
-                    }
+        }
+
+        // Decrypt mirror (server alternatif)
+        val mirror = servers?.mirror
+        if (mirror != null) {
+            val decrypt = AesHelper.cryptoAESHandler(
+                base64Decode(mirror),
+                KEY.toByteArray(),
+                false,
+                "AES/CBC/NoPadding"
+            )
+            tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
+                embed.value.map { entry ->
+                    loadFixedExtractor(
+                        entry.value,
+                        embed.key.removePrefix("v"),
+                        "$mainUrl/",
+                        subtitleCallback,
+                        callback
+                    )
                 }
             }
         }
