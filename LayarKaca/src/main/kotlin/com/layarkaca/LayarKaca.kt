@@ -142,32 +142,19 @@ class LayarKaca : MainAPI() {
 
     override suspend fun loadLinks(
         data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val document = app.get(data).document
 
-        // Coba berbagai selector untuk tombol server
-        document.select("ul#loadProviders > li, .server-list li, .provider li").forEach { li ->
-            val href = fixUrl(li.select("a").attr("href"))
-            if (href.isNotEmpty()) {
-                val iframe = app.get(href, referer = "$mainUrl/")
-                    .document
-                    .selectFirst("div.embed iframe, iframe")
-                    ?.attr("src") ?: return@forEach
-                loadExtractor(iframe, mainUrl, subtitleCallback, callback)
-            }
+    document.select("ul#player-list li a").forEach { server ->
+        val playerUrl = server.attr("data-url").ifEmpty { server.attr("href") }
+        if (playerUrl.startsWith("http")) {
+            loadExtractor(playerUrl, mainUrl, subtitleCallback, callback)
         }
+    }
 
-        // Fallback: langsung ambil iframe dari halaman
-        document.select("iframe[src]").forEach { iframe ->
-            val src = iframe.attr("src")
-            if (src.startsWith("http")) {
-                loadExtractor(src, mainUrl, subtitleCallback, callback)
-            }
-        }
-
-        return true
+    return true
     }
 }
