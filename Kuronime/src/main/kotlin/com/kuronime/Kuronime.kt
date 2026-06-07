@@ -222,7 +222,14 @@ class Kuronime : MainAPI() {
                 ).forEach(callback)
             }
         }
-
+val srcSd = servers?.src_sd
+if (srcSd != null) {
+    val decrypt = AesHelper.cryptoAESHandler(
+        base64Decode(srcSd),
+        KEY.toByteArray(),
+        false,
+        "AES/CBC/NoPadding"
+    )
         // Decrypt mirror (server alternatif)
         val mirror = servers?.mirror
         if (mirror != null) {
@@ -280,6 +287,7 @@ class Kuronime : MainAPI() {
 
     data class Servers(
         @JsonProperty("src") var src: String? = null,
+        @JsonProperty("src_sd") var src_sd: String? = null,
         @JsonProperty("mirror") var mirror: String? = null,
     )
 
