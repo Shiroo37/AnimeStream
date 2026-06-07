@@ -89,10 +89,11 @@ class Kuronime : MainAPI() {
     private fun Element.toSearchResult(): AnimeSearchResponse {
         val href = getProperAnimeLink(fixUrlNull(this.selectFirst("a")?.attr("href")).toString())
         val title = this.select(".bsuxtt, .tt > h4").text().trim()
-        val posterUrl = fixUrlNull(
-            this.selectFirst("div.view,div.bt")?.nextElementSibling()?.select("img")
-                ?.attr("data-src")
-        )
+       val posterUrl = fixUrlNull(
+    this.selectFirst("img[src*='uploads'], img[data-src*='uploads']")?.let {
+        it.attr("src").ifEmpty { it.attr("data-src") }
+    }
+)
         val epNum = this.select(".ep").text().replace(Regex("\\D"), "").trim().toIntOrNull()
         val tvType = getType(this.selectFirst(".bt > span")?.text().toString())
         return newAnimeSearchResponse(title, href, tvType) {
