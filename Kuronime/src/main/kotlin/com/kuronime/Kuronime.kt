@@ -20,8 +20,8 @@ import java.net.URI
 import java.util.ArrayList
 
 class Kuronime : MainAPI() {
-    override var mainUrl = "https://kuronime.biz/"
-    private var animekuUrl = "https://www.animekuid.com"
+    override var mainUrl = "https://kuronime.sbs"
+    private var animekuUrl = "https://animeku.org"
     override var name = "Kuronime"
     override val hasQuickSearch = true
     override val hasMainPage = true
@@ -182,53 +182,71 @@ class Kuronime : MainAPI() {
     ): Boolean {
 
         val document = app.get(data).document
-        val id = document.selectFirst("div#content script:containsData(is_singular)")?.data()
-            ?.substringAfter("\"")?.substringBefore("\";")
+
+        // Cari script yang mengandung xenHash + is_singular = true
+        // Di dalamnya ada variable obfuscated yang isinya ID terenkripsi
+        val scriptData = document.select("script")
+            .firstOrNull { it.data().contains("xenHash") && it.data().contains("is_singular = true") }
+            ?.data() ?: throw ErrorLoadingException("No script found")
+
+        // Ekstrak nilai base64 dari variable obfuscated (pola: var _0x... = "...")
+        val id = Regex("""var\s+_0x\w+\s*=\s*"([A-Za-z0-9+/=]+)"""")
+            .findAll(scriptData)
+            .lastOrNull()
+            ?.groupValues?.get(1)
             ?: throw ErrorLoadingException("No id found")
+
+        // Endpoint baru: /api/v9/sources (ganti dari /afi.php)
+        // Format: JSON bukan form-data
         val servers = app.post(
-            "$animekuUrl/afi.php", data = mapOf(
-                "id" to id
-            ), referer = "$mainUrl/"
+            "$animekuUrl/api/v9/sources",
+            json = mapOf("id" to id),
+            referer = "$mainUrl/",
+            headers = mapOf(
+                "Origin" to "https://player.animeku.org",
+                "Referer" to "https://player.animeku.org/"
+            )
         ).parsedSafe<Servers>()
 
-        runAllAsync(
-                {
-                    val decrypt = AesHelper.cryptoAESHandler(
-                        base64Decode(servers?.src ?: return@runAllAsync),
-                        KEY.toByteArray(),
-                        false,
-                        "AES/CBC/NoPadding"
-                    )
-                    val source =
-                        tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
-                    M3u8Helper.generateM3u8(
-                        this.name,
-                        source ?: return@runAllAsync,
-                        "$animekuUrl/",
-                        headers = mapOf("Origin" to animekuUrl)
-                    ).forEach(callback)
-                },
-                {
-                    val decrypt = AesHelper.cryptoAESHandler(
-                        base64Decode(servers?.mirror ?: return@runAllAsync),
-                        KEY.toByteArray(),
-                        false,
-                        "AES/CBC/NoPadding"
-                    )
-                    tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
-                        embed.value.amap {
-                            loadFixedExtractor(
-                                it.value,
-                                embed.key.removePrefix("v"),
-                                "$mainUrl/",
-                                subtitleCallback,
-                                callback
-                            )
-                        }
+        argamap(
+            {
+                // Decrypt src (video utama M3U8)
+                val decrypt = AesHelper.cryptoAESHandler(
+                    base64Decode(servers?.src ?: return@argamap),
+                    KEY.toByteArray(),
+                    false,
+                    "AES/CBC/NoPadding"
+                )
+                val source =
+                    tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+                M3u8Helper.generateM3u8(
+                    this.name,
+                    source ?: return@argamap,
+                    "https://player.animeku.org/",
+                    headers = mapOf("Origin" to "https://player.animeku.org")
+                ).forEach(callback)
+            },
+            {
+                // Decrypt mirror (server alternatif)
+                val decrypt = AesHelper.cryptoAESHandler(
+                    base64Decode(servers?.mirror ?: return@argamap),
+                    KEY.toByteArray(),
+                    false,
+                    "AES/CBC/NoPadding"
+                )
+                tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
+                    embed.value.amap {
+                        loadFixedExtractor(
+                            it.value,
+                            embed.key.removePrefix("v"),
+                            "$mainUrl/",
+                            subtitleCallback,
+                            callback
+                        )
                     }
-
                 }
-            )
+            }
+        )
 
         return true
     }
