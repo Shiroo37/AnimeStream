@@ -9,9 +9,7 @@ import com.lagradost.cloudstream3.extractors.helper.AesHelper
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.ArrayList
@@ -264,22 +262,7 @@ class Kuronime : MainAPI() {
         referer: String? = null,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ) {
-        loadExtractor(url, referer, subtitleCallback) { link ->
-            callback.invoke(
-                newExtractorLink(
-                    link.name,
-                    link.name,
-                    link.url,
-                    link.type
-                ) {
-                    this.referer = link.referer
-                    this.quality = getQualityFromName(quality)
-                    this.headers = link.headers
-                }
-            )
-        }
-    }
+    ) = loadExtractor(url, referer, subtitleCallback, callback)
 
     private fun getBaseUrl(url: String): String {
         return URI(url).let {
