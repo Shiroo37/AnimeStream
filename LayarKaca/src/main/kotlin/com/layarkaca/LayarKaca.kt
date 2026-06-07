@@ -1,37 +1,16 @@
 package com.layarkaca
 
-import com.lagradost.cloudstream3.HomePageResponse
-import com.lagradost.cloudstream3.LoadResponse
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addScore
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.addQuality
-import com.lagradost.cloudstream3.addSub
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.fixUrl
-import com.lagradost.cloudstream3.fixUrlNull
-import com.lagradost.cloudstream3.mainPageOf
-import com.lagradost.cloudstream3.newAnimeSearchResponse
-import com.lagradost.cloudstream3.newEpisode
-import com.lagradost.cloudstream3.newHomePageResponse
-import com.lagradost.cloudstream3.newMovieLoadResponse
-import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newTvSeriesLoadResponse
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
 class LayarKaca : MainAPI() {
-
     override var mainUrl = "https://tv3.lk21online.mom"
-    private var seriesUrl = "https://tv3.lk21online.mom"
-
     override var name = "LayarKaca"
     override val hasMainPage = true
     override var lang = "id"
@@ -39,33 +18,33 @@ class LayarKaca : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/populer/page/" to "Film Terpopuler",
-        "$mainUrl/rating/page/" to "Film Berdasarkan IMDb Rating",
+        "$mainUrl/rating/page/" to "Film Rating Tertinggi",
         "$mainUrl/latest/page/" to "Film Upload Terbaru",
         "$mainUrl/country/south-korea/page/" to "Drama Korea",
         "$mainUrl/country/china/page/" to "Series China",
         "$mainUrl/series/west/page/" to "Series West",
-        "$mainUrl/populer/page/" to "Series Terpopuler",
         "$mainUrl/latest-series/page/" to "Series Terbaru",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get(request.data + page).document
-        // Selector baru: article tanpa class
         val home = document.select("article").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        // Ambil title dari h1/h2/h3 atau dari attribute title di tag a
-        val title = this.selectFirst("h1, h2, h3")?.text()?.trim()
+        val title = this.selectFirst("h3.poster-title, h1, h2, h3")?.text()?.trim()
             ?: this.selectFirst("a")?.attr("title")
                 ?.replace(Regex("(?i)nonton\\s+(film|series|movie)?\\s*"), "")
-                ?.replace(Regex("\\s*streaming gratis.*", RegexOption.IGNORE_CASE), "")
+                ?.replace(Regex("(?i)\\s*streaming gratis.*"), "")
                 ?.trim()
             ?: return null
         val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
-        // Deteksi tipe: kalau ada .episode = series, kalau tidak = movie
+        // Poster pakai data-src karena lazyload
+        val posterUrl = fixUrlNull(
+            this.selectFirst("img")?.attr("data-src")?.ifEmpty { null }
+                ?: this.selectFirst("img")?.attr("src")
+        )
         val type = if (this.selectFirst(".episode") != null) TvType.TvSeries else TvType.Movie
         return if (type == TvType.TvSeries) {
             val episode = this.selectFirst(".episode strong")?.text()?.toIntOrNull()
@@ -74,7 +53,7 @@ class LayarKaca : MainAPI() {
                 addSub(episode)
             }
         } else {
-            val quality = this.selectFirst(".quality")?.text()?.trim() ?: ""
+            val quality = this.selectFirst(".quality, .label")?.text()?.trim() ?: ""
             newMovieSearchResponse(title, href, TvType.Movie) {
                 this.posterUrl = posterUrl
                 addQuality(quality)
@@ -83,32 +62,51 @@ class LayarKaca : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // Pakai WordPress standard search
-        val document = app.get("$mainUrl/?s=$query").document
+        val document = app.get("$mainUrl/search?s=$query").document
         return document.select("article").mapNotNull { it.toSearchResult() }
     }
+
+    data class WatchHistoryData(
+        @JsonProperty("id") val id: Int? = null,
+        @JsonProperty("title") val title: String? = null,
+        @JsonProperty("rating") val rating: String? = null,
+        @JsonProperty("poster") val poster: String? = null,
+        @JsonProperty("slug") val slug: String? = null,
+        @JsonProperty("year") val year: Int? = null,
+        @JsonProperty("runtime") val runtime: String? = null
+    )
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        val title = document.selectFirst("h1[itemprop=name], h1.entry-title, h1")
-            ?.text()?.trim() ?: return null
-        val poster = fixUrlNull(
-            document.selectFirst(".wp-post-image, img[itemprop=image], .poster img")
-                ?.attr("src")
+        // Ambil data dari JSON embed di halaman
+        val watchData = tryParseJson<WatchHistoryData>(
+            document.selectFirst("script#watch-history-data")?.data()
         )
-        val tags = document.select("a[rel=tag], .genres a, .genre a").map { it.text() }
-        val year = document.selectFirst(".year, [itemprop=datePublished]")
-            ?.text()?.trim()?.toIntOrNull()
-        val tvType = if (document.select(".episode-list, .eps-list, div.serial-wrapper").isNotEmpty())
+
+        val title = watchData?.title
+            ?: document.selectFirst("h1")?.text()
+                ?.replace(Regex("(?i)nonton\\s+"), "")
+                ?.replace(Regex("(?i)\\s+sub indo.*"), "")
+                ?.replace(Regex("(?i)\\s+di lk21.*"), "")
+                ?.trim()
+            ?: return null
+
+        val poster = watchData?.poster
+            ?: document.selectFirst("img.lazyload[data-src*='poster']")?.attr("data-src")
+
+        val tags = document.select("div.tag-list span.tag a").map { it.text() }
+        val year = watchData?.year
+        val description = document.selectFirst("div.synopsis")?.text()?.trim()
+        val rating = watchData?.rating
+        val actors = document.select("div.detail a[href*='/artist/']").map { it.text() }
+
+        // Deteksi tipe: series punya episode list
+        val tvType = if (document.select(".episode-list, .eps-list").isNotEmpty())
             TvType.TvSeries else TvType.Movie
-        val description = document.selectFirst("[itemprop=description], .desc, .sinopsis")
-            ?.text()?.trim()
-        val rating = document.selectFirst(".rating, [itemprop=ratingValue]")?.text()
-        val actors = document.select("[itemprop=actor] a, .cast a").map { it.text() }
 
         return if (tvType == TvType.TvSeries) {
-            val episodes = document.select(".episode-list a, .eps-list a, div.episode-list > a")
+            val episodes = document.select(".episode-list a, .eps-list a")
                 .mapNotNull { ep ->
                     val epHref = fixUrl(ep.attr("href"))
                     val epNum = ep.text().filter { it.isDigit() }.toIntOrNull()
@@ -142,19 +140,20 @@ class LayarKaca : MainAPI() {
 
     override suspend fun loadLinks(
         data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val document = app.get(data).document
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val document = app.get(data).document
 
-    document.select("ul#player-list li a").forEach { server ->
-        val playerUrl = server.attr("data-url").ifEmpty { server.attr("href") }
-        if (playerUrl.startsWith("http")) {
-            loadExtractor(playerUrl, mainUrl, subtitleCallback, callback)
+        // Ambil semua server dari player-list
+        document.select("ul#player-list li a").forEach { server ->
+            val playerUrl = server.attr("data-url").ifEmpty { server.attr("href") }
+            if (playerUrl.startsWith("http")) {
+                loadExtractor(playerUrl, data, subtitleCallback, callback)
+            }
         }
-    }
 
-    return true
+        return true
     }
 }
