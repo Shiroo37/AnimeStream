@@ -12,7 +12,6 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlinx.coroutines.Dispatchers
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.ArrayList
@@ -235,15 +234,18 @@ class Kuronime : MainAPI() {
                 false,
                 "AES/CBC/NoPadding"
             )
-            tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
-                embed.value.map { entry ->
-                    loadFixedExtractor(
-                        entry.value,
-                        embed.key.removePrefix("v"),
-                        "$mainUrl/",
-                        subtitleCallback,
-                        callback
-                    )
+            val mirrors = tryParseJson<Mirrors>(decrypt)
+            if (mirrors != null) {
+                for ((key, valueMap) in mirrors.embed) {
+                    for ((_, value) in valueMap) {
+                        loadFixedExtractor(
+                            value,
+                            key.removePrefix("v"),
+                            "$mainUrl/",
+                            subtitleCallback,
+                            callback
+                        )
+                    }
                 }
             }
         }
@@ -262,22 +264,20 @@ class Kuronime : MainAPI() {
         referer: String? = null,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ) = coroutineScope {
+    ) {
         loadExtractor(url, referer, subtitleCallback) { link ->
-            launch(Dispatchers.IO) {
-				callback.invoke(               
-					newExtractorLink(
-						link.name,
-						link.name,
-						link.url,
-						link.type
-					){
-						this.referer = link.referer
-						this.quality = getQualityFromName(quality)
-						this.headers = link.headers
-					}
-				)
-            }
+            callback.invoke(
+                newExtractorLink(
+                    link.name,
+                    link.name,
+                    link.url,
+                    link.type
+                ) {
+                    this.referer = link.referer
+                    this.quality = getQualityFromName(quality)
+                    this.headers = link.headers
+                }
+            )
         }
     }
 
