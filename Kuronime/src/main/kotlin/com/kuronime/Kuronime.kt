@@ -173,70 +173,79 @@ class Kuronime : MainAPI() {
             ?.groupValues?.get(1)
             ?: throw ErrorLoadingException("No id found")
 
-        val serversResponse = app.post(
-            "$animekuUrl/api/v9/sources",
-            json = mapOf("id" to id),
-            referer = "$mainUrl/",
-            headers = mapOf(
-                "Origin" to "https://player.animeku.org",
-                "Referer" to "https://player.animeku.org/"
-            )
+        override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    val document = app.get(data).document
+
+    val scriptData = document.select("script")
+        .firstOrNull { it.data().contains("xenHash") && it.data().contains("is_singular = true") }
+        ?.data() ?: throw ErrorLoadingException("No script found")
+
+    val id = Regex("""var\s+_0x\w+\s*=\s*"([A-Za-z0-9+/=]+)"""")
+        .findAll(scriptData)
+        .lastOrNull()
+        ?.groupValues?.get(1)
+        ?: throw ErrorLoadingException("No id found")
+
+    val serversResponse = app.post(
+        "$animekuUrl/api/v9/sources",
+        json = mapOf("id" to id),
+        referer = "$mainUrl/",
+        headers = mapOf(
+            "Origin" to "https://player.animeku.org",
+            "Referer" to "https://player.animeku.org/"
         )
+    )
 
-        // DEBUG: uncomment baris ini kalau mau liat raw response
-        throw ErrorLoadingException("RAW: ${serversResponse.text}")
+    val servers = serversResponse.parsedSafe<Servers>()
 
-        val servers = serversResponse.parsedSafe<Servers>()
-
-        // Decrypt src — video utama M3U8
-        val src = servers?.src
-        if (src != null) {
-            val decrypt = AesHelper.cryptoAESHandler(
-                base64Decode(src), KEY.toByteArray(), false, "AES/CBC/NoPadding"
-            )
-            val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
-            if (source != null) {
-                M3u8Helper.generateM3u8(
-                    name, source, "https://player.animeku.org/",
-                    headers = mapOf("Origin" to "https://player.animeku.org")
-                ).forEach(callback)
-            }
+    // Decrypt src — video utama M3U8
+    val src = servers?.src
+    if (src != null) {
+        val decrypt = AesHelper.cryptoAESHandler(src, KEY.toByteArray(), false)
+        val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+        if (source != null) {
+            M3u8Helper.generateM3u8(
+                name, source, "https://player.animeku.org/",
+                headers = mapOf("Origin" to "https://player.animeku.org")
+            ).forEach(callback)
         }
-
-        // Decrypt src_sd — server alternatif SD
-        val srcSd = servers?.src_sd
-        if (srcSd != null) {
-            val decrypt = AesHelper.cryptoAESHandler(
-                base64Decode(srcSd), KEY.toByteArray(), false, "AES/CBC/NoPadding"
-            )
-            val mirrors = tryParseJson<Mirrors>(decrypt)
-            if (mirrors != null) {
-                for ((key, valueMap) in mirrors.embed) {
-                    for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
-                    }
-                }
-            }
-        }
-
-        // Decrypt mirror — server alternatif HD
-        val mirror = servers?.mirror
-        if (mirror != null) {
-            val decrypt = AesHelper.cryptoAESHandler(
-                base64Decode(mirror), KEY.toByteArray(), false, "AES/CBC/NoPadding"
-            )
-            val mirrors = tryParseJson<Mirrors>(decrypt)
-            if (mirrors != null) {
-                for ((key, valueMap) in mirrors.embed) {
-                    for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
-                    }
-                }
-            }
-        }
-
-        return true
     }
+
+    // Decrypt src_sd — server alternatif SD
+    val srcSd = servers?.src_sd
+    if (srcSd != null) {
+        val decrypt = AesHelper.cryptoAESHandler(srcSd, KEY.toByteArray(), false)
+        val mirrors = tryParseJson<Mirrors>(decrypt)
+        if (mirrors != null) {
+            for ((key, valueMap) in mirrors.embed) {
+                for ((_, value) in valueMap) {
+                    loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
+                }
+            }
+        }
+    }
+
+    // Decrypt mirror — server alternatif HD
+    val mirror = servers?.mirror
+    if (mirror != null) {
+        val decrypt = AesHelper.cryptoAESHandler(mirror, KEY.toByteArray(), false)
+        val mirrors = tryParseJson<Mirrors>(decrypt)
+        if (mirrors != null) {
+            for ((key, valueMap) in mirrors.embed) {
+                for ((_, value) in valueMap) {
+                    loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
+                }
+            }
+        }
+    }
+
+    return true
+}
 
     private fun String.toJsonFormat(): String {
         return if (this.startsWith("\"")) this.substringAfter("\"").substringBeforeLast("\"")
