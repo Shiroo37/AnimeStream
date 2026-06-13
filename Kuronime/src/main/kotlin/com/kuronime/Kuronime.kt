@@ -50,11 +50,16 @@ class Kuronime : MainAPI() {
         "$mainUrl/movies/page/" to "Movies",
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
         val req = app.get(request.data + page)
         mainUrl = getBaseUrl(req.url)
         val document = req.document
-        val home = document.select("article").map { it.toSearchResult() }
+        val home = document.select("article").map {
+            it.toSearchResult()
+        }
         return newHomePageResponse(request.name, home)
     }
 
@@ -64,10 +69,17 @@ class Kuronime : MainAPI() {
         } else {
             var title = uri.substringAfter("$mainUrl/")
             title = when {
-                (title.contains("-episode")) && !(title.contains("-movie")) -> Regex("nonton-(.+)-episode").find(title)?.groupValues?.get(1).toString()
-                (title.contains("-movie")) -> Regex("nonton-(.+)-movie").find(title)?.groupValues?.get(1).toString()
+                (title.contains("-episode")) && !(title.contains("-movie")) -> Regex("nonton-(.+)-episode").find(
+                    title
+                )?.groupValues?.get(1).toString()
+
+                (title.contains("-movie")) -> Regex("nonton-(.+)-movie").find(title)?.groupValues?.get(
+                    1
+                ).toString()
+
                 else -> title
             }
+
             "$mainUrl/anime/$title"
         }
     }
@@ -76,9 +88,8 @@ class Kuronime : MainAPI() {
         val href = getProperAnimeLink(fixUrlNull(this.selectFirst("a")?.attr("href")).toString())
         val title = this.select(".bsuxtt, .tt > h4").text().trim()
         val posterUrl = fixUrlNull(
-            this.selectFirst("img[src*='uploads'], img[data-src*='uploads']")?.let {
-                it.attr("src").ifEmpty { it.attr("data-src") }
-            }
+            this.selectFirst("div.view,div.bt")?.nextElementSibling()?.select("img")
+                ?.attr("data-src")
         )
         val epNum = this.select(".ep").text().replace(Regex("\\D"), "").trim().toIntOrNull()
         val tvType = getType(this.selectFirst(".bt > span")?.text().toString())
@@ -114,14 +125,12 @@ class Kuronime : MainAPI() {
         val document = app.get(url).document
 
         val title = document.selectFirst(".entry-title")?.text().toString().trim()
-        val poster = document.selectFirst(".wp-post-image")?.let {
-            it.attr("data-src").ifEmpty { it.attr("src") }
-        }
+        val poster = document.selectFirst("div.l[itemprop=image] > img")?.attr("data-src")
         val tags = document.select(".infodetail > ul > li:nth-child(2) > a").map { it.text() }
-        val type = getType(
-            document.selectFirst(".infodetail > ul > li:nth-child(7)")?.ownText()
-                ?.removePrefix(":")?.lowercase()?.trim() ?: "tv"
-        )
+        val type =
+            getType(document.selectFirst(".infodetail > ul > li:nth-child(7)")?.ownText()?.removePrefix(":")
+                ?.lowercase()?.trim() ?: "tv")
+
         val trailer = document.selectFirst("div.tply iframe")?.attr("data-src")
         val year = Regex("\\d, (\\d*)").find(
             document.select(".infodetail > ul > li:nth-child(5)").text()
@@ -131,10 +140,12 @@ class Kuronime : MainAPI() {
                 .replace(Regex("\\W"), "")
         )
         val description = document.select("span.const > p").text()
+
         val episodes = document.select("div.bixbox.bxcl > ul > li").mapNotNull {
             val link = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
             val name = it.selectFirst("a")?.text() ?: return@mapNotNull null
-            val episode = Regex("(\\d+[.,]?\\d*)").find(name)?.groupValues?.getOrNull(0)?.toIntOrNull()
+            val episode =
+                Regex("(\\d+[.,]?\\d*)").find(name)?.groupValues?.getOrNull(0)?.toIntOrNull()
             newEpisode(link) { this.episode = episode }
         }.reversed()
 
@@ -161,6 +172,7 @@ class Kuronime : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+
         val document = app.get(data).document
 
         val scriptData = document.select("script")
@@ -173,7 +185,7 @@ class Kuronime : MainAPI() {
             ?.groupValues?.get(1)
             ?: throw ErrorLoadingException("No id found")
 
-        val serversResponse = app.post(
+        val servers = app.post(
             "$animekuUrl/api/v9/sources",
             json = mapOf("id" to id),
             referer = "$mainUrl/",
@@ -181,46 +193,47 @@ class Kuronime : MainAPI() {
                 "Origin" to "https://player.animeku.org",
                 "Referer" to "https://player.animeku.org/"
             )
-        )
-
-        val servers = serversResponse.parsedSafe<Servers>()
+        ).parsedSafe<Servers>()
 
         // Decrypt src — video utama M3U8
         val src = servers?.src
         if (src != null) {
-            val decrypt = AesHelper.cryptoAESHandler(src, KEY.toByteArray(), false)
+            val decrypt = AesHelper.cryptoAESHandler(
+                base64Decode(src),
+                KEY.toByteArray(),
+                false,
+                "AES/CBC/NoPadding"
+            )
             val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
             if (source != null) {
                 M3u8Helper.generateM3u8(
-                    name, source, "https://player.animeku.org/",
+                    name,
+                    source,
+                    "https://player.animeku.org/",
                     headers = mapOf("Origin" to "https://player.animeku.org")
                 ).forEach(callback)
             }
         }
 
-        // Decrypt src_sd — server alternatif SD
-        val srcSd = servers?.src_sd
-        if (srcSd != null) {
-            val decrypt = AesHelper.cryptoAESHandler(srcSd, KEY.toByteArray(), false)
-            val mirrors = tryParseJson<Mirrors>(decrypt)
-            if (mirrors != null) {
-                for ((key, valueMap) in mirrors.embed) {
-                    for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
-                    }
-                }
-            }
-        }
-
-        // Decrypt mirror — server alternatif HD
+        // Decrypt mirror — server alternatif (tanpa base64Decode, format CryptoJS)
         val mirror = servers?.mirror
         if (mirror != null) {
-            val decrypt = AesHelper.cryptoAESHandler(mirror, KEY.toByteArray(), false)
+            val decrypt = AesHelper.cryptoAESHandler(
+                mirror,
+                KEY.toByteArray(),
+                false
+            )
             val mirrors = tryParseJson<Mirrors>(decrypt)
             if (mirrors != null) {
                 for ((key, valueMap) in mirrors.embed) {
                     for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
+                        loadFixedExtractor(
+                            value,
+                            key.removePrefix("v"),
+                            "$mainUrl/",
+                            subtitleCallback,
+                            callback
+                        )
                     }
                 }
             }
@@ -243,7 +256,9 @@ class Kuronime : MainAPI() {
     ) = loadExtractor(url, referer, subtitleCallback, callback)
 
     private fun getBaseUrl(url: String): String {
-        return URI(url).let { "${it.scheme}://${it.host}" }
+        return URI(url).let {
+            "${it.scheme}://${it.host}"
+        }
     }
 
     data class Mirrors(
@@ -256,7 +271,6 @@ class Kuronime : MainAPI() {
 
     data class Servers(
         @JsonProperty("src") var src: String? = null,
-        @JsonProperty("src_sd") var src_sd: String? = null,
         @JsonProperty("mirror") var mirror: String? = null,
     )
 
