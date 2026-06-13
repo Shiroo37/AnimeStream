@@ -183,7 +183,7 @@ class Kuronime : MainAPI() {
             )
         ).parsedSafe<Servers>()
 
-        // Decrypt src — video utama M3U8
+        // Decrypt src — video utama M3U8 (HD)
         val src = servers?.src
         if (src != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -198,33 +198,41 @@ class Kuronime : MainAPI() {
             }
         }
 
-        // Decrypt src_sd — server alternatif SD
+        // Decrypt src_sd — M3U8 alternatif (480p SD)
+        // Strukturnya sama kayak src: {"token":"...","src":"https://...m3u8"}
         val srcSd = servers?.src_sd
         if (srcSd != null) {
             val decrypt = AesHelper.cryptoAESHandler(
                 base64Decode(srcSd), KEY.toByteArray(), false, "AES/CBC/NoPadding"
             )
-            val mirrors = tryParseJson<Mirrors>(decrypt)
-            if (mirrors != null) {
-                for ((key, valueMap) in mirrors.embed) {
-                    for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
-                    }
-                }
+            val source = tryParseJson<Sources>(decrypt?.toJsonFormat())?.src?.replace("\\", "")
+            if (source != null) {
+                M3u8Helper.generateM3u8(
+                    name, source, "https://player.animeku.org/",
+                    headers = mapOf("Origin" to "https://player.animeku.org")
+                ).forEach(callback)
             }
         }
 
-        // Decrypt mirror — server alternatif HD
+        // Decrypt mirror — embed server alternatif (doodstream, mp4upload, dll)
+        // Strukturnya: {"embed":{"v360p":{"doodstream":"url","mp4upload":"url",...},...}}
         val mirror = servers?.mirror
         if (mirror != null) {
             val decrypt = AesHelper.cryptoAESHandler(
                 base64Decode(mirror), KEY.toByteArray(), false, "AES/CBC/NoPadding"
             )
-            val mirrors = tryParseJson<Mirrors>(decrypt)
+            val mirrors = tryParseJson<Mirrors>(decrypt?.toJsonFormat())
             if (mirrors != null) {
                 for ((key, valueMap) in mirrors.embed) {
                     for ((_, value) in valueMap) {
-                        loadFixedExtractor(value, key.removePrefix("v"), "$mainUrl/", subtitleCallback, callback)
+                        if (value == null) continue // skip server yang null
+                        loadFixedExtractor(
+                            value,
+                            key.removePrefix("v"),
+                            "$mainUrl/",
+                            subtitleCallback,
+                            callback
+                        )
                     }
                 }
             }
@@ -250,8 +258,9 @@ class Kuronime : MainAPI() {
         return URI(url).let { "${it.scheme}://${it.host}" }
     }
 
+    // Nilai Map nullable karena beberapa server bisa null di response
     data class Mirrors(
-        @JsonProperty("embed") val embed: Map<String, Map<String, String>> = emptyMap(),
+        @JsonProperty("embed") val embed: Map<String, Map<String, String?>> = emptyMap(),
     )
 
     data class Sources(
