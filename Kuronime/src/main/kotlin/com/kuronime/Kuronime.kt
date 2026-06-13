@@ -215,7 +215,31 @@ class Kuronime : MainAPI() {
             }
         }
 
-        // Decrypt mirror — server alternatif (tanpa base64Decode, format CryptoJS)
+        // Decrypt src_sd — server alternatif SD
+        val srcSd = servers?.src_sd
+        if (srcSd != null) {
+            val decrypt = AesHelper.cryptoAESHandler(
+                srcSd,
+                KEY.toByteArray(),
+                false
+            )
+            val mirrors = tryParseJson<Mirrors>(decrypt)
+            if (mirrors != null) {
+                for ((key, valueMap) in mirrors.embed) {
+                    for ((_, value) in valueMap) {
+                        loadFixedExtractor(
+                            value,
+                            key.removePrefix("v"),
+                            "$mainUrl/",
+                            subtitleCallback,
+                            callback
+                        )
+                    }
+                }
+            }
+        }
+
+        // Decrypt mirror — server alternatif HD
         val mirror = servers?.mirror
         if (mirror != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -271,6 +295,7 @@ class Kuronime : MainAPI() {
 
     data class Servers(
         @JsonProperty("src") var src: String? = null,
+        @JsonProperty("src_sd") var src_sd: String? = null,
         @JsonProperty("mirror") var mirror: String? = null,
     )
 
