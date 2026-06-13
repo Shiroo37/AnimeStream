@@ -181,7 +181,7 @@ class Kuronime : MainAPI() {
                 "Origin" to "https://player.animeku.org",
                 "Referer" to "https://player.animeku.org/"
             )
-        ).parsedSafe<Servers>()
+        )throw ErrorLoadingException(serverResponse.text)
 
         // Decrypt src — video utama M3U8
         val src = servers?.src
