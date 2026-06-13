@@ -182,8 +182,12 @@ class Kuronime : MainAPI() {
                 "Referer" to "https://player.animeku.org/"
             )
         )
-        throw ErrorLoadingException("RAW: ${serverResponse.text}")
-    }
+
+        // DEBUG: uncomment baris ini kalau mau liat raw response
+        throw ErrorLoadingException("RAW: ${serversResponse.text}")
+
+        val servers = serversResponse.parsedSafe<Servers>()
+
         // Decrypt src — video utama M3U8
         val src = servers?.src
         if (src != null) {
@@ -284,4 +288,4 @@ class Kuronime : MainAPI() {
     data class Search(
         @JsonProperty("anime") var anime: ArrayList<Anime> = arrayListOf()
     )
-                       }
+}
