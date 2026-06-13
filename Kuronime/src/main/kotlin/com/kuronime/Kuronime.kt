@@ -155,23 +155,6 @@ class Kuronime : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data).document
-
-        val scriptData = document.select("script")
-            .firstOrNull { it.data().contains("xenHash") && it.data().contains("is_singular = true") }
-            ?.data() ?: throw ErrorLoadingException("No script found")
-
-        val id = Regex("""var\s+_0x\w+\s*=\s*"([A-Za-z0-9+/=]+)"""")
-            .findAll(scriptData)
-            .lastOrNull()
-            ?.groupValues?.get(1)
-            ?: throw ErrorLoadingException("No id found")
 
         override suspend fun loadLinks(
     data: String,
