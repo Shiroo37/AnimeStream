@@ -173,7 +173,7 @@ class Kuronime : MainAPI() {
             ?.groupValues?.get(1)
             ?: throw ErrorLoadingException("No id found")
 
-        val servers = app.post(
+        val serversResponse = app.post(
             "$animekuUrl/api/v9/sources",
             json = mapOf("id" to id),
             referer = "$mainUrl/",
@@ -181,7 +181,9 @@ class Kuronime : MainAPI() {
                 "Origin" to "https://player.animeku.org",
                 "Referer" to "https://player.animeku.org/"
             )
-        ).parsedSafe<Servers>()
+        )
+
+        val servers = serversResponse.parsedSafe<Servers>()
 
         // Decrypt src — video utama M3U8
         val src = servers?.src
