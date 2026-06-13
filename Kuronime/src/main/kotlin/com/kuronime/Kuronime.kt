@@ -182,8 +182,7 @@ class Kuronime : MainAPI() {
                 "Referer" to "https://player.animeku.org/"
             )
         )
-                throw ErrorLoadingException(serverResponse.text)
-    }
+        throw ErrorLoadingException("RAW: ${serverResponse.text}")
 
         // Decrypt src — video utama M3U8
         val src = servers?.src
