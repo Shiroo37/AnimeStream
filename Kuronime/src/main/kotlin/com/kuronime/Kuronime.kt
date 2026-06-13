@@ -183,7 +183,7 @@ class Kuronime : MainAPI() {
             )
         )
         throw ErrorLoadingException("RAW: ${serverResponse.text}")
-
+    }
         // Decrypt src — video utama M3U8
         val src = servers?.src
         if (src != null) {
