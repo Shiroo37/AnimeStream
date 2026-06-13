@@ -225,7 +225,7 @@ class Kuronime : MainAPI() {
                     val qualityLabel = key.removePrefix("v") // "360p", "480p", "720p", "1080p"
                     for ((_, value) in valueMap) {
                         if (value == null) continue
-                        loadFixedExtractor(value, qualityLabel, "$mainUrl/", subtitleCallback) { link ->
+                        loadFixedExtractor(value, qualityLabel, "$mainUrl/", subtitleCallback) { link: ExtractorLink ->
                             // Tambahin label kualitas biar ga deduplikasi & user bisa pilih
                             callback(link.copy(name = "${link.name} [$qualityLabel]"))
                         }
