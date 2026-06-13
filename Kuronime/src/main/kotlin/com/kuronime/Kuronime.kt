@@ -183,7 +183,7 @@ class Kuronime : MainAPI() {
             )
         ).parsedSafe<Servers>()
 
-        // Decrypt src — video utama M3U8 (HD)
+        // Decrypt src — M3U8 utama (HD)
         val src = servers?.src
         if (src != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -199,7 +199,6 @@ class Kuronime : MainAPI() {
         }
 
         // Decrypt src_sd — M3U8 alternatif (480p SD)
-        // Strukturnya sama kayak src: {"token":"...","src":"https://...m3u8"}
         val srcSd = servers?.src_sd
         if (srcSd != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -215,7 +214,6 @@ class Kuronime : MainAPI() {
         }
 
         // Decrypt mirror — embed server alternatif (doodstream, mp4upload, dll)
-        // Strukturnya: {"embed":{"v360p":{"doodstream":"url","mp4upload":"url",...},...}}
         val mirror = servers?.mirror
         if (mirror != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -224,15 +222,13 @@ class Kuronime : MainAPI() {
             val mirrors = tryParseJson<Mirrors>(decrypt?.toJsonFormat())
             if (mirrors != null) {
                 for ((key, valueMap) in mirrors.embed) {
+                    val qualityLabel = key.removePrefix("v") // "360p", "480p", "720p", "1080p"
                     for ((_, value) in valueMap) {
-                        if (value == null) continue // skip server yang null
-                        loadFixedExtractor(
-                            value,
-                            key.removePrefix("v"),
-                            "$mainUrl/",
-                            subtitleCallback,
-                            callback
-                        )
+                        if (value == null) continue
+                        loadFixedExtractor(value, qualityLabel, "$mainUrl/", subtitleCallback) { link ->
+                            // Tambahin label kualitas biar ga deduplikasi & user bisa pilih
+                            callback(link.copy(name = "${link.name} [$qualityLabel]"))
+                        }
                     }
                 }
             }
