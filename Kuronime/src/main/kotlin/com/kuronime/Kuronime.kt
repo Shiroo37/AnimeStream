@@ -173,7 +173,7 @@ class Kuronime : MainAPI() {
             ?.groupValues?.get(1)
             ?: throw ErrorLoadingException("No id found")
 
-        val servers = app.post(
+        val serversResponse = app.post(
             "$animekuUrl/api/v9/sources",
             json = mapOf("id" to id),
             referer = "$mainUrl/",
