@@ -232,7 +232,7 @@ class Kuronime : MainAPI() {
                             subtitleCallback
                         ) { link ->
                             callback(
-                                ExtractorLink(
+                                newExtractorLink(
                                     source = link.source,
                                     name = "${link.name} [$qualityLabel]",
                                     url = link.url,
