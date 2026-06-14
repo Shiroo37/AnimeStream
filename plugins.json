@@ -1,5 +1,26 @@
 [
     {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=154.26.137.28&sz=%size%",
+        "fileHash": "sha256-a0bc0a07177969c451f07ce3f66a2b220f7a986f9593709ec5a7976c2b725f4b",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Shiroo37/AnimeStream",
+        "fileSize": 18278,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "Shiroo37"
+        ],
+        "tvTypes": [
+            "AnimeMovie",
+            "Anime",
+            "OVA"
+        ],
+        "version": 16,
+        "internalName": "AnimeSail",
+        "url": "https://raw.githubusercontent.com/Shiroo37/AnimeStream/builds/AnimeSail.cs3",
+        "name": "AnimeSail"
+    },
+    {
         "iconUrl": "https://www.google.com/s2/favicons?domain=kuronime.biz&sz=%size%",
         "fileHash": "sha256-de90b1921e1f07df2f4a2bae43642eced410e14c0a8355245daf1668753f56ba",
         "apiVersion": 1,

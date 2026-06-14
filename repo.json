@@ -1,0 +1,8 @@
+{
+    "name": "AnimeStream Repo",
+    "description": "Cloudstream Anime Indonesia",
+    "manifestVersion": 1,
+    "pluginLists": [
+      "https://raw.githubusercontent.com/Shiroo37/AnimeStream/builds/plugins.json"
+    ]
+}
