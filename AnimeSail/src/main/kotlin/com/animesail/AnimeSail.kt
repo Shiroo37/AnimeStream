@@ -97,7 +97,7 @@ class AnimeSail : MainAPI() {
         )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = fetchpage(request.data + page).document
+        val document = fetchPage(request.data + page).document
         val home = document.select("article").map { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -136,13 +136,13 @@ class AnimeSail : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val link = "$mainUrl/?s=$query"
-        val document = fetchpage(link).document
+        val document = fetchPage(link).document
 
         return document.select("div.listupd article").map { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = fetchpage(url).document
+        val document = fetchPage(url).document
 
         val title =
             document.selectFirst("h1.entry-title")
@@ -202,7 +202,7 @@ class AnimeSail : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val document = fetchpage(data).document
+        val document = fetchPage(data).document
 
         document.select(".mobius > .mirror > option").amap {
             safeApiCall {
@@ -216,7 +216,7 @@ class AnimeSail : MainAPI() {
                 when {
                     iframe.startsWith("$mainUrl/utils/player/arch/") ||
                             iframe.startsWith("$mainUrl/utils/player/race/") ->
-                        fetchpage(iframe, ref = data).document.select("source").attr("src")
+                        fetchPage(iframe, ref = data).document.select("source").attr("src")
                             .let { link ->
                                 val source =
                                     when {
@@ -248,7 +248,7 @@ class AnimeSail : MainAPI() {
 
                     iframe.startsWith("$mainUrl/utils/player/framezilla/") ||
                             iframe.startsWith("https://uservideo.xyz") -> {
-                        fetchpage(iframe, ref = data).document.select("iframe").attr("src").let { link
+                        fetchPage(iframe, ref = data).document.select("iframe").attr("src").let { link
                             ->
                             loadFixedExtractor(
                                 fixUrl(link),
