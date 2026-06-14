@@ -10,7 +10,6 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 import java.net.URI
 import java.util.ArrayList
@@ -184,7 +183,7 @@ class Kuronime : MainAPI() {
             )
         ).parsedSafe<Servers>()
 
-        // Decrypt src — M3U8 utama (HD)
+        // Decrypt src — video utama M3U8 (HD)
         val src = servers?.src
         if (src != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -200,6 +199,7 @@ class Kuronime : MainAPI() {
         }
 
         // Decrypt src_sd — M3U8 alternatif (480p SD)
+        // Strukturnya sama kayak src: {"token":"...","src":"https://...m3u8"}
         val srcSd = servers?.src_sd
         if (srcSd != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -215,6 +215,7 @@ class Kuronime : MainAPI() {
         }
 
         // Decrypt mirror — embed server alternatif (doodstream, mp4upload, dll)
+        // Strukturnya: {"embed":{"v360p":{"doodstream":"url","mp4upload":"url",...},...}}
         val mirror = servers?.mirror
         if (mirror != null) {
             val decrypt = AesHelper.cryptoAESHandler(
@@ -223,28 +224,15 @@ class Kuronime : MainAPI() {
             val mirrors = tryParseJson<Mirrors>(decrypt?.toJsonFormat())
             if (mirrors != null) {
                 for ((key, valueMap) in mirrors.embed) {
-                    val qualityLabel = key.removePrefix("v")
                     for ((_, value) in valueMap) {
-                        if (value == null) continue
+                        if (value == null) continue // skip server yang null
                         loadFixedExtractor(
                             value,
-                            qualityLabel,
+                            key.removePrefix("v"),
                             "$mainUrl/",
-                            subtitleCallback
-                        ) { link ->
-                            callback(
-                                newExtractorLink(
-                                    source = link.source,
-                                    name = "${link.name} [$qualityLabel]",
-                                    url = link.url,
-                                    referer = link.referer,
-                                    quality = link.quality,
-                                    isM3u8 = link.isM3u8,
-                                    headers = link.headers,
-                                    extractorData = link.extractorData
-                                )
-                            )
-                        }
+                            subtitleCallback,
+                            callback
+                        )
                     }
                 }
             }
