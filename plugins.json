@@ -1,0 +1,23 @@
+[
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=kuronime.biz&sz=%size%",
+        "fileHash": "sha256-de90b1921e1f07df2f4a2bae43642eced410e14c0a8355245daf1668753f56ba",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Shiroo37/AnimeStream",
+        "fileSize": 26275,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "Shiroo37"
+        ],
+        "tvTypes": [
+            "AnimeMovie",
+            "Anime",
+            "OVA"
+        ],
+        "version": 26,
+        "internalName": "Kuronime",
+        "url": "https://raw.githubusercontent.com/Shiroo37/AnimeStream/builds/Kuronime.cs3",
+        "name": "Kuronime"
+    }
+]
