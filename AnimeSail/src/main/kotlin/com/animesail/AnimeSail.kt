@@ -47,9 +47,10 @@ class AnimeSail : MainAPI() {
             url,
             headers =
                 mapOf(
-                    "Accept" to
-                            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-                ),
+                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    "Accept-Language" to "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Redmi Note 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        ),
             cookies = mapOf("_as_ipin_ct" to "ID"),
             referer = ref
         )
