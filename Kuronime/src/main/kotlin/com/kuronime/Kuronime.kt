@@ -222,12 +222,27 @@ class Kuronime : MainAPI() {
             val mirrors = tryParseJson<Mirrors>(decrypt?.toJsonFormat())
             if (mirrors != null) {
                 for ((key, valueMap) in mirrors.embed) {
-                    val qualityLabel = key.removePrefix("v") // "360p", "480p", "720p", "1080p"
+                    val qualityLabel = key.removePrefix("v")
                     for ((_, value) in valueMap) {
                         if (value == null) continue
-                        loadFixedExtractor(value, qualityLabel, "$mainUrl/", subtitleCallback) { link: ExtractorLink ->
-                            // Tambahin label kualitas biar ga deduplikasi & user bisa pilih
-                            callback(link.copy(name = "${link.name} [$qualityLabel]"))
+                        loadFixedExtractor(
+                            value,
+                            qualityLabel,
+                            "$mainUrl/",
+                            subtitleCallback
+                        ) { link ->
+                            callback(
+                                ExtractorLink(
+                                    source = link.source,
+                                    name = "${link.name} [$qualityLabel]",
+                                    url = link.url,
+                                    referer = link.referer,
+                                    quality = link.quality,
+                                    isM3u8 = link.isM3u8,
+                                    headers = link.headers,
+                                    extractorData = link.extractorData
+                                )
+                            )
                         }
                     }
                 }
